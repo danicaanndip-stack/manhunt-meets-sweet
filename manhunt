@@ -1,0 +1,216 @@
+<!DOCTYPE2 html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Manhunt Scavenger — Glow Grid</title>
+<style>
+:root {
+  --bg:#1a0f00;         /* deep brown background */
+  --card:#3a1f0a;       /* dark chestnut card */
+  --muted:#d9c4a3;      /* light tan for hints/text */
+  --text:#fff1e6;       /* soft cream for main text */
+  --accent:#ff8c42;     /* pumpkin orange for unlocked */
+  --accent2:#ffc97c;    /* golden yellow for completed */
+  --danger:#d94f04;     /* reddish-orange for errors */
+  --warning:#ffb347;    /* warm amber for dots/highlights */
+}
+* { box-sizing: border-box; }
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  color: var(--text);
+  background: radial-gradient(1200px 800px at 10% -10%, #40210a 0%, #1a0f00 60%) fixed,
+              radial-gradient(900px 600px at 120% 120%, #331a05 0%, #1a0f00 55%) fixed;
+}
+.wrap { max-width: 800px; margin: 0 auto; padding: 20px; }
+h1 { margin: 0 0 8px 0; font-size: 24px; }
+.card {
+  background: linear-gradient(180deg, rgba(255,255,255,.03), transparent 35%), var(--card);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 15px 35px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+}
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 780px) { .row { grid-template-columns: 1fr; } }
+input, button, select {
+  background: #4b220c;
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 16px;
+}
+input:focus, button:focus {
+  outline: none;
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 3px rgba(255,201,124,.25);
+}
+button {
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+.btn-primary { background: linear-gradient(180deg,#7a3916,#4b220c); border-color: rgba(255,140,66,.7); }
+.btn-ghost { background: #4b220c; }
+.hint { color: var(--muted); font-size: 13px; }
+.center { display: flex; align-items: center; gap: 8px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(80px, 1fr)); gap: 12px; margin-top: 12px; }
+.cell {
+  position: relative;
+  border-radius: 16px;
+  padding: 18px 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  border: 1px solid rgba(255,255,255,.08);
+  text-align: center;
+  font-weight: 800;
+  font-size: 22px;
+  user-select: none;
+  transition: transform .08s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.cell.locked { color: #6b7280; }
+.cell.unlocked {
+  color: var(--text);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px 2px var(--accent) inset, 0 0 15px 3px var(--accent);
+}
+.cell.completed {
+  border-color: var(--accent2);
+  box-shadow: 0 0 8px 2px var(--accent2) inset, 0 0 15px 3px var(--accent2);
+}
+.cell .dot { position: absolute; top: 10px; left: 10px; width: 10px; height: 10px; border-radius: 50%; background: #6b3b1d; }
+.cell.unlocked .dot { background: var(--warning); }
+.cell.completed .dot { background: var(--accent2); }
+.task {
+  display: none;
+  margin-top: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px dashed rgba(255,140,66,.5);
+  background: linear-gradient(180deg, rgba(255,140,66,.08), rgba(255,201,124,.03));
+}
+.task h3 { margin: 0 0 6px 0; }
+.task p.riddle { margin: 6px 0; font-style: italic; color: var(--muted);}
+.board { margin-top: 16px; }
+.teamrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #4b220c;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  padding: 10px;
+}
+.progress-container { display: flex; align-items: center; gap: 8px; }
+.footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔦Manhunt Meets Gwyn's Birthday</h1>
+  <div class="hint">Enter the 4-digit code to unlock tasks. Solve riddles and make videos as proof.</div>
+
+  <div class="card">
+    <div class="row">
+      <input id="teamInput" placeholder="Team name" maxlength="24">
+      <input id="codeInput" placeholder="4-digit code" maxlength="4">
+      <button id="unlockBtn" class="btn-primary">Unlock</button>
+    </div>
+    <div id="grid" class="grid"></div>
+    <div id="taskBox" class="task"></div>
+  </div>
+
+  <div class="card">
+    <strong>Local Leaderboard</strong>
+    <div id="board" class="board"></div>
+  </div>
+
+  <div class="footer">Offline mode — one device per team. Compare scores at the end!</div>
+</div>
+
+<script>
+const CONFIG = {
+  codes: [
+    { code: "1426", task: "📹 Make a video of your team singing the Jeopardy theme.", riddle: "I’m always running but never move. What am I?" },
+    { code: "3087", task: "📹 Film a 5s slo‑mo wave across the team.", riddle: "I speak without a mouth and hear without ears. What am I?" },
+    { code: "7712", task: "📹 Record your team forming an arrow pointing home.", riddle: "The more you take, the more you leave behind. What am I?" },
+    { code: "5529", task: "📹 Take a video of a human pyramid held 3 seconds.", riddle: "What has keys but can’t open locks?" },
+    { code: "9361", task: "📹 Get a picture of another team.", riddle: "What has hands but can’t clap?" },
+    { code: "6840", task: "📹 Film a foot race to a mailbox of choice.", riddle: "What can travel around the world while staying in a corner?" },
+    { code: "2155", task: "📹 Crab-walk past a light source for 5 seconds.", riddle: "What has a heart that doesn’t beat?" },
+    { code: "4993", task: "📹 Group plank for 20s while one narrates.", riddle: "What comes once in a minute, twice in a moment, but never in a thousand years?" },
+    { code: "8204", task: "📹 Spell your team name with bodies on video.", riddle: "I’m tall when I’m young, and short when I’m old. What am I?" },
+  ]
+};
+
+const GRID_IDS = Array.from({length:9}, (_,i)=>i);
+let state = { unlocked: {}, completed: {}, team: '' };
+
+const gridEl = document.getElementById('grid');
+const taskBox = document.getElementById('taskBox');
+const boardEl = document.getElementById('board');
+const teamInput = document.getElementById('teamInput');
+const codeInput = document.getElementById('codeInput');
+
+function renderGrid(){
+  gridEl.innerHTML = '';
+  GRID_IDS.forEach(i=>{
+    const div = document.createElement('div');
+    div.className = state.completed[i] ? 'cell completed' : state.unlocked[i] ? 'cell unlocked' : 'cell locked';
+    div.textContent = i+1; // only show number in middle
+    if(state.unlocked[i]){
+      div.style.cursor = 'pointer';
+      div.title = 'View task';
+      div.addEventListener('click', ()=>showTask(i));
+    }
+    gridEl.appendChild(div);
+  });
+}
+
+function showTask(i){
+  const spec = CONFIG.codes[i];
+  taskBox.style.display='block';
+  taskBox.innerHTML=`
+    <h3>Task ${i+1}</h3>
+    <div>${spec.task}</div>
+    <p class="riddle">Riddle: ${spec.riddle}</p>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button id="markDone" class="btn-primary">Mark Completed ✓</button>
+      <button id="closeTask" class="btn-ghost">Close</button>
+    </div>
+  `;
+  document.getElementById('markDone').onclick = ()=>{
+    state.completed[i]=true;
+    renderGrid();
+    renderBoard();
+    taskBox.style.display='none';
+  };
+  document.getElementById('closeTask').onclick = ()=>{ taskBox.style.display='none'; };
+}
+
+function renderBoard(){
+  const teamName = state.team || 'Your Team';
+  const done = Object.values(state.completed).filter(Boolean).length;
+  boardEl.innerHTML=`<div class="teamrow"><div>${teamName}</div><div class="progress-container"><progress max="9" value="${done}"></progress><span>${done}/9 tasks</span></div></div>`;
+}
+
+document.getElementById('unlockBtn').onclick = ()=>{
+  const code = codeInput.value.trim();
+  state.team = teamInput.value.trim() || 'Team';
+  const idx = CONFIG.codes.findIndex(c=>c.code===code);
+  if(idx===-1){ alert('❌ Invalid code!'); codeInput.value=''; return; }
+  state.unlocked[idx]=true;
+  renderGrid();
+  showTask(idx);
+  renderBoard();
+  codeInput.value='';
+};
+
+renderGrid();
+renderBoard();
+</script>
+</body>
+</html>
